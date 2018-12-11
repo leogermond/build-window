@@ -11,7 +11,7 @@ def api_functions
   }
 end
 
-def get_url(url, auth = nil)
+def get_url(url, auth = nil, token = nil)
   uri = URI.parse(url)
   http = Net::HTTP.new(uri.host, uri.port)
   if uri.scheme == 'https'
@@ -22,6 +22,8 @@ def get_url(url, auth = nil)
 
   if auth != nil then
     request.basic_auth *auth
+  elsif token != nil then
+    request['Authorization']  = "token #{token}"
   end
 
   response = http.request(request)
@@ -50,8 +52,13 @@ def get_teamcity_build_health(build_id)
 end
 
 def get_travis_build_health(build_id)
-  url = "https://api.travis-ci.org/repos/#{build_id}/builds?event_type=push"
-  results = get_url url
+
+  if ENV['TRAVIS_TOKEN'] != nil then
+     token = ENV['TRAVIS_TOKEN']
+  end
+
+  url = "https://api.travis-ci.com/repos/#{build_id}/builds?event_type=push"
+  results = get_url url, nil, token
   successful_count = results.count { |result| result['result'] == 0 }
   latest_build = results[0]
 
