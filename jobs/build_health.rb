@@ -1,3 +1,5 @@
+require 'date'
+
 SUCCESS = 'Successful'
 FAILED = 'Failed'
 
@@ -7,7 +9,8 @@ def api_functions
     'TeamCity' => lambda { |build_id| get_teamcity_build_health build_id},
     'Bamboo' => lambda { |build_id| get_bamboo_build_health build_id},
     'Go' => lambda { |build_id| get_go_build_health build_id},
-    'Jenkins' => lambda { |build_id| get_jenkins_build_health build_id}
+    'Jenkins' => lambda { |build_id| get_jenkins_build_health build_id},
+    'BitRise' => lambda { |build_id| get_bitrise_build_health build_id}
   }
 end
 
@@ -52,7 +55,6 @@ def get_teamcity_build_health(build_id)
 end
 
 def get_travis_build_health(build_id)
-
   if ENV['TRAVIS_TOKEN'] != nil then
      token = ENV['TRAVIS_TOKEN']
   end
@@ -66,9 +68,35 @@ def get_travis_build_health(build_id)
     name: build_id,
     status: latest_build['result'] == 0 ? SUCCESS : FAILED,
     duration: latest_build['duration'],
-    link: "https://travis-ci.org/#{build_id}/builds/#{latest_build['id']}",
+    link: "https://travis-ci.com/#{build_id}/builds/#{latest_build['id']}",
     health: calculate_health(successful_count, results.count),
     time: latest_build['started_at']
+  }
+end
+
+def get_bitrise_build_health(build_id)
+
+  if ENV['BITRISE_TOKEN'] != nil then
+     token = ENV['BITRISE_TOKEN']
+  end
+
+  url = "https://api.bitrise.io/v0.1/apps/#{build_id}/builds"
+  results = get_url url, nil, token
+  results = results["data"]
+  builds = results.select { |result| result['status'] != 0 }
+  successful_count = builds.count { |build| build['status'] == 1 }
+  latest_build = builds[0]
+
+  build_name = get_url("https://api.bitrise.io/v0.1/apps/#{build_id}", nil, token=token)['data']['title']
+  duration = ((DateTime.rfc3339(latest_build['finished_at']) - DateTime.rfc3339(latest_build['triggered_at'])) * 24 * 3600).to_i
+
+  return {
+    name: build_name,
+    status: latest_build['status'] == 1 ? SUCCESS : FAILED,
+    duration: duration,
+    link: "https://bitrise.io/build/#{latest_build['slug']}",
+    health: calculate_health(successful_count, results.count),
+    time: latest_build['triggered_at']
   }
 end
 
@@ -137,8 +165,12 @@ def get_jenkins_build_health(build_id)
   }
 end
 
-SCHEDULER.every '20s' do
-  Builds::BUILD_LIST.each do |build|
+def build_all(builds)
+  builds.each do |build|
     send_event(build['id'], get_build_health(build))
   end
+end
+
+SCHEDULER.every '20s' do
+  build_all Builds::BUILD_LIST
 end
