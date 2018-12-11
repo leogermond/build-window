@@ -1,6 +1,7 @@
 {
   "builds": [
     {"id": "plumelabs/embedded", "server": "Travis"},
+    {"id": "plumelabs/pyplume", "server": "Travis"},
     {"id": "2f015faeea5897fc", "server": "BitRise"},
     {"id": "d417f2a0f0c8f176", "server": "BitRise"}
   ]
